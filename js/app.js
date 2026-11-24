@@ -2,6 +2,9 @@
 (() => {
   const data = window.MakerLinkData;
   const auth = window.MakerLinkAuth;
+  const feed = window.MakerLinkFeed;
+  const profiles = window.MakerLinkProfiles;
+  const content = window.MakerLinkContent;
   const paths = {
     home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-8H9v8H4a1 1 0 0 1-1-1Z"/>',
     compass: '<circle cx="12" cy="12" r="9"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5Z"/>',
@@ -20,7 +23,11 @@
     spark: '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5ZM21 2v4m-2-2h4"/>',
     book: '<path d="M12 5C8 2 4 3 2 4v15c3-2 7-1 10 1 3-2 7-3 10-1V4c-2-1-6-2-10 1Zm0 0v15"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
+    comment: '<path d="M21 11a9 9 0 0 1-9 9H3l2-4a9 9 0 1 1 16-5Z"/>',
+    tools: '<path d="m3 3 18 18M3 8l5-5m6 11-8 8-4-4 8-8m4-4 4-4 4 4-4 4"/>'
   };
   const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.chip}</svg>`;
   const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -75,10 +82,10 @@
   }
 
   function home() {
-    return `<div class="page-heading"><div><h1>Olá, ${escape(auth.user().name.split(' ')[0])} <span aria-hidden="true">✦</span></h1><p>Uma nova ideia começa com uma boa conexão.</p></div><button class="button primary" data-info="publicacao">${icon('plus')} Criar publicação</button></div>
+    return `<div class="page-heading"><div><h1>Olá, ${escape(auth.user().name.split(' ')[0])} <span aria-hidden="true">✦</span></h1><p>Uma nova ideia começa com uma boa conexão.</p></div><button class="button primary" data-route="publicar">${icon('plus')} Criar publicação</button></div>
       <section class="hero"><div class="hero-copy"><span class="eyebrow">${icon('spark')} BEM-VINDO AO MAKERLINK</span><h2>Conecte ideias.<br>Construa o futuro.</h2><p>Seu espaço para aprender, compartilhar projetos e criar com quem também gosta de fazer acontecer.</p><button class="button primary" data-route="comunidades">Encontre sua comunidade</button></div><div class="hero-art">${icon('chip')}</div></section>
       <section aria-labelledby="interests-title"><div class="section-heading"><h2 id="interests-title">Explore seus interesses</h2><span>O que move você?</span></div><div class="interest-list">${data.interests.map(item => `<button class="interest" data-interest="${escape(item)}">${item}</button>`).join('')}</div></section>
-      <section aria-labelledby="feed-title"><div class="section-heading"><h2 id="feed-title">Na comunidade</h2><div class="feed-label"><span></span>Prévia do feed</div></div>${data.posts.map(post => `<article class="card post"><div class="post-header"><span class="avatar ${post.color}">${post.initials}</span><div><strong>${post.author}</strong><span class="badge">${post.role}</span><small>${post.community} · ${post.time}</small></div><span class="post-type">${post.type}</span></div><h3>${post.title}</h3><p>${post.text}</p><div class="tags">${post.tags.map(tag => `<span class="tag">#${tag}</span>`).join('')}</div><div class="post-footer">${icon('info')} Conteúdo demonstrativo<span class="sample-label">Interações em uma próxima etapa</span></div></article>`).join('')}</section>`;
+      <section id="feed" aria-labelledby="feed-title">${feed.render(auth.user(), icon)}</section>`;
   }
 
   function placeholder(route) {
@@ -95,7 +102,8 @@
     const requested = location.hash.slice(1) || (auth.user() ? 'inicio' : 'boas-vindas');
     let route = auth.guard(requested);
     const isAuth = auth.isRoute(route);
-    if (!isAuth && !data.navigation.some(item => item.id === route)) {
+    const profile = profiles.resolve(route, auth.user());
+    if (!isAuth && !profile && route !== 'publicar' && !data.navigation.some(item => item.id === route)) {
       route = 'inicio';
       notify('Tela não encontrada. Você voltou ao início.');
     }
@@ -117,20 +125,25 @@
     authMain.innerHTML = '';
     updateIdentity();
     document.querySelectorAll('[data-nav]').forEach(link => {
-      const active = link.dataset.nav === route;
+      const active = link.dataset.nav === (profile ? 'perfil' : route);
       link.classList.toggle('active', active);
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
-    main.innerHTML = route === 'inicio' ? home() : placeholder(route);
-    document.title = `MakerLink · ${data.navigation.find(item => item.id === route).label}`;
+    main.innerHTML = route === 'publicar' ? content.render() : route === 'inicio' ? home() : profile ? profiles.render(profile, auth.user(), icon) : placeholder(route);
+    document.title = `MakerLink · ${profile ? (profile.isOwn ? data.navigation.find(item => item.id === 'perfil').label : profile.name) : (route === 'publicar' ? 'Criar publicação' : data.navigation.find(item => item.id === route).label)}`;
     setMenu(false);
     if (focus) { main.focus(); window.scrollTo(0, 0); }
   }
 
-  document.addEventListener('submit', event => auth.submit(event, notify));
+  document.addEventListener('submit', event => {
+    auth.submit(event, notify);
+    content.submit(event, notify);
+  });
   document.addEventListener('change', event => window.MakerLinkOnboarding.change(event, auth.user()));
   document.addEventListener('click', event => {
+    profiles.click(event, auth.user(), notify, openInfo);
+    feed.click(event, auth.user(), icon, notify);
     window.MakerLinkOnboarding.click(event, auth.user(), notify);
     auth.click(event, notify, openInfo);
     if (event.target.closest('.skip-link')) {
@@ -153,7 +166,6 @@
     const info = event.target.closest('[data-info]');
     if (info) {
       const messages = {
-        publicacao: ['Suas ideias merecem ser compartilhadas', 'A criação de projetos, dúvidas e tutoriais será implementada em uma próxima etapa. Este modal demonstra o componente de diálogo da aplicação.'],
         sobre: ['Sobre o MakerLink', 'Conecte ideias. Construa o futuro. Protótipo acadêmico para a disciplina de Redes Sociais e Virtuais do curso de Tecnologias da Informação e Comunicação da UFSC. Esta etapa apresenta a fundação visual e a navegação.'],
         privacidade: ['Privacidade no MakerLink', 'Este protótipo usa apenas dados fictícios e não envia informações a servidores. Configurações de visibilidade, consentimentos e exclusão de conta serão implementadas em uma próxima etapa.']
       };

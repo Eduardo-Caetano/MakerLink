@@ -41,7 +41,7 @@ function boot(storage = new Map(), blocked = false) {
   };
   context.history = { replaceState(a, b, hash) { context.location.hash = hash; } };
   vm.createContext(context);
-  for (const file of ['data.js', 'auth.js', 'onboarding.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file), 'utf8'), context);
+  for (const file of ['data.js', 'auth.js', 'onboarding.js', 'content.js', 'feed.js', 'profiles.js', 'app.js']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file), 'utf8'), context);
   const auth = context.window.MakerLinkAuth;
   const submit = id => auth.submit({ target: element(id), preventDefault() {} }, message => { context.feedback = message; });
   const click = (selector, target = {}) => auth.click({ target: { closest: value => value === selector ? target : null } }, message => { context.feedback = message; }, (title, text) => { context.modal = { title, text }; });
